@@ -4,7 +4,11 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
+from dotenv import load_dotenv
 import os
+
+# Load environment variables
+load_dotenv()
 
 app = FastAPI()
 
@@ -19,21 +23,21 @@ templates = Jinja2Templates(directory="templates")
 def init_saml_auth(req):
     saml_settings = {
         "strict": True,
-        "debug": True,
+        "debug": os.getenv('APP_DEBUG', 'True').lower() == 'true',
         "sp": {
-            "entityId": "your-app-entity-id",
+            "entityId": os.getenv('SAML_SP_ENTITY_ID'),
             "assertionConsumerService": {
-                "url": "http://localhost:8000/acs",
+                "url": os.getenv('SAML_SP_ACS_URL'),
                 "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
             }
         },
         "idp": {
-            "entityId": "https://your-adfs-server/federationmetadata/2007-06/federationmetadata.xml",
+            "entityId": os.getenv('SAML_IDP_ENTITY_ID'),
             "singleSignOnService": {
-                "url": "https://your-adfs-server/adfs/ls/",
+                "url": os.getenv('SAML_IDP_SSO_URL'),
                 "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
             },
-            "x509cert": "Your-ADFS-Certificate"
+            "x509cert": os.getenv('SAML_IDP_X509_CERT')
         }
     }
     return OneLogin_Saml2_Auth(req, saml_settings)
@@ -52,12 +56,14 @@ async def prepare_request(request: Request):
 
 @app.get("/")
 async def home(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
-
-@app.get("/login")
-async def login(request: Request):
     req = await prepare_request(request)
     auth = init_saml_auth(req)
+    
+    # 이미 인증된 세션이 있는지 확인
+    if auth.is_authenticated():
+        return RedirectResponse(os.getenv('TARGET_REDIRECT_URL'), status_code=303)
+    
+    # 인증되지 않은 경우 자동으로 SAML 로그인 시작
     return RedirectResponse(auth.login())
 
 @app.post("/acs")
@@ -69,6 +75,6 @@ async def acs(request: Request):
     
     if not errors:
         if auth.is_authenticated():
-            return RedirectResponse("https://your-target-site.com", status_code=303)
+            return RedirectResponse(os.getenv('TARGET_REDIRECT_URL'), status_code=303)
     
     raise HTTPException(status_code=401, detail=', '.join(errors))
