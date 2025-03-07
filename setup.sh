@@ -1,4 +1,7 @@
 #!/bin/bash
+echo "Creating necessary directories..."
+python3 setup.py
+
 echo "Creating Python virtual environment..."
 python3 -m venv venv
 
