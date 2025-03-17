@@ -2,7 +2,8 @@ from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from onelogin.saml2.auth import OneLogin_Saml2_Auth
+# onelogin.saml2.auth 대신 custom_saml.auth에서 가져오기
+from custom_saml.auth import Custom_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 from dotenv import load_dotenv
 import os
@@ -40,7 +41,8 @@ def init_saml_auth(req):
             "x509cert": os.getenv('SAML_IDP_X509_CERT')
         }
     }
-    return OneLogin_Saml2_Auth(req, saml_settings)
+    # OneLogin_Saml2_Auth 대신 Custom_Saml2_Auth 사용
+    return Custom_Saml2_Auth(req, saml_settings)
 
 async def prepare_request(request: Request):
     form_data = await request.form()
@@ -66,15 +68,13 @@ async def home(request: Request):
     # 인증되지 않은 경우 자동으로 SAML 로그인 시작
     return RedirectResponse(auth.login())
 
-@app.post("/acs")
+@app.post("/")
 async def acs(request: Request):
     req = await prepare_request(request)
     auth = init_saml_auth(req)
     auth.process_response()
-    errors = auth.get_errors()
     
-    if not errors:
-        if auth.is_authenticated():
-            return RedirectResponse(os.getenv('TARGET_REDIRECT_URL'), status_code=303)
+    if auth.is_authenticated():
+        return RedirectResponse(os.getenv('TARGET_REDIRECT_URL'), status_code=303)
     
-    raise HTTPException(status_code=401, detail=', '.join(errors))
+    raise HTTPException(status_code=401, detail='not authenticated')
