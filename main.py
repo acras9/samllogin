@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 # onelogin.saml2.auth 대신 custom_saml.auth에서 가져오기
 from custom_saml.auth import Custom_Saml2_Auth
@@ -55,6 +55,14 @@ async def prepare_request(request: Request):
         'post_data': form_data,
         'query_string': request.url.query
     }
+
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse("static/manifest.json")
+
+@app.get("/sw.js")
+async def service_worker():
+    return FileResponse("static/sw.js")
 
 @app.get("/")
 async def home(request: Request):
